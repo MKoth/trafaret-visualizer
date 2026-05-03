@@ -7,9 +7,10 @@ type Props = {
   onAdd: () => void
   onChange: (level: Level) => void
   onDelete: (id: string) => void
+  onReorder: (fromIndex: number, toIndex: number) => void
 }
 
-export default function LevelManager({ levels, onAdd, onChange, onDelete }: Props) {
+export default function LevelManager({ levels, onAdd, onChange, onDelete, onReorder }: Props) {
   const update = (id: string, patch: Partial<Level>) => {
     const existing = levels.find(l => l.id === id)
     if (!existing) return
@@ -30,9 +31,9 @@ export default function LevelManager({ levels, onAdd, onChange, onDelete }: Prop
       )}
 
       <div className="level-list">
-        {levels.map(level => (
+        {levels.map((level, idx) => (
           <div key={level.id} className="level-item">
-            {/* Name + color + delete */}
+            {/* Name + color + reorder + delete */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <input
                 type="color"
@@ -48,6 +49,18 @@ export default function LevelManager({ levels, onAdd, onChange, onDelete }: Prop
                 style={{ flex: 1, fontSize: 13, padding: '2px 6px' }}
                 onChange={e => update(level.id, { name: e.target.value })}
               />
+              <button
+                className="icon-btn"
+                title="Move up"
+                disabled={idx === 0}
+                onClick={() => onReorder(idx, idx - 1)}
+              >▲</button>
+              <button
+                className="icon-btn"
+                title="Move down"
+                disabled={idx === levels.length - 1}
+                onClick={() => onReorder(idx, idx + 1)}
+              >▼</button>
               <button
                 className="icon-btn icon-btn--danger"
                 title="Delete level"

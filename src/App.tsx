@@ -74,12 +74,33 @@ export default function App() {
       // Load levels and images for that project
       const [storedLevels, storedImages] = await Promise.all([loadLevelsByProject(activeId!), loadImagesByProject(activeId!)])
       if (cancelled) return
+
+      // Restore saved level order
+      const savedLevelOrder = window.localStorage.getItem(`levelOrder:${activeId}`)
+      if (savedLevelOrder) {
+        const order: string[] = JSON.parse(savedLevelOrder)
+        storedLevels.sort((a, b) => {
+          const ai = order.indexOf(a.id); const bi = order.indexOf(b.id)
+          return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi)
+        })
+      }
       setLevels(storedLevels)
+
       const rehydrated: ImageEntry[] = storedImages.map(si => {
         const src = URL.createObjectURL(si.blob)
         blobUrlsRef.current[si.id] = src
         return { ...si, src, transform: si.transform ?? DEFAULT_TRANSFORM }
       })
+
+      // Restore saved image order
+      const savedImageOrder = window.localStorage.getItem(`imageOrder:${activeId}`)
+      if (savedImageOrder) {
+        const order: string[] = JSON.parse(savedImageOrder)
+        rehydrated.sort((a, b) => {
+          const ai = order.indexOf(a.id); const bi = order.indexOf(b.id)
+          return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi)
+        })
+      }
       setImages(rehydrated)
       rehydrated.forEach(img => extractContours(img.id, img.src, img.params))
       setReady(true)
@@ -246,6 +267,30 @@ export default function App() {
     await saveLevel(updated)
   }, [])
 
+  // ── Reorder levels ──────────────────────────────────────────────────────────
+  const handleReorderLevels = useCallback((from: number, to: number) => {
+    setLevels(prev => {
+      const next = [...prev]
+      const [item] = next.splice(from, 1)
+      next.splice(to, 0, item)
+      if (activeProjectId)
+        window.localStorage.setItem(`levelOrder:${activeProjectId}`, JSON.stringify(next.map(l => l.id)))
+      return next
+    })
+  }, [activeProjectId])
+
+  // ── Reorder images ───────────────────────────────────────────────────────────
+  const handleReorderImages = useCallback((from: number, to: number) => {
+    setImages(prev => {
+      const next = [...prev]
+      const [item] = next.splice(from, 1)
+      next.splice(to, 0, item)
+      if (activeProjectId)
+        window.localStorage.setItem(`imageOrder:${activeProjectId}`, JSON.stringify(next.map(i => i.id)))
+      return next
+    })
+  }, [activeProjectId])
+
   // ── Delete level ──────────────────────────────────────────────────────────────
   const handleDeleteLevel = useCallback(async (id: string) => {
     setLevels(prev => prev.filter(l => l.id !== id))
@@ -299,6 +344,7 @@ export default function App() {
           onAdd={handleAddLevel}
           onChange={handleUpdateLevel}
           onDelete={id => confirmDelete('level', id)}
+          onReorder={handleReorderLevels}
         />
 
         <ImageList
@@ -312,6 +358,7 @@ export default function App() {
           onParamChange={handleParamChange}
           onLevelChange={handleLevelChange}
           onTransformChange={handleTransformChange}
+          onReorder={handleReorderImages}
         />
 
         <ConfirmModal

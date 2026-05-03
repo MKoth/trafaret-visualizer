@@ -27,6 +27,7 @@ type Props = {
   onParamChange: (id: string, key: keyof ContourParams, value: number | boolean) => void
   onLevelChange: (id: string, levelId: string | null) => void
   onTransformChange: (id: string, transform: ImageTransform) => void
+  onReorder: (fromIndex: number, toIndex: number) => void
 }
 
 export default function ImageList({
@@ -40,6 +41,7 @@ export default function ImageList({
   onParamChange,
   onLevelChange,
   onTransformChange,
+  onReorder,
 }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
@@ -52,7 +54,7 @@ export default function ImageList({
     <div style={{ marginTop: 16 }}>
       <p style={{ margin: '0 0 8px', fontWeight: 600 }}>Images ({images.length})</p>
       <div className="image-list">
-        {images.map(img => {
+        {images.map((img, idx) => {
           const rd = renderData[img.id]
           const isSelected = img.id === selectedId
           const isExpanded = !!expanded[img.id]
@@ -81,13 +83,26 @@ export default function ImageList({
                   </span>
                 </div>
                 <div className="image-item__actions" onClick={e => e.stopPropagation()}>
+                  {/* Reorder */}
+                  <button
+                    className="icon-btn"
+                    title="Move up"
+                    disabled={idx === 0}
+                    onClick={() => onReorder(idx, idx - 1)}
+                  >▲</button>
+                  <button
+                    className="icon-btn"
+                    title="Move down"
+                    disabled={idx === images.length - 1}
+                    onClick={() => onReorder(idx, idx + 1)}
+                  >▼</button>
                   {/* Expand params */}
                   <button
                     className="icon-btn"
                     title="Edit params"
                     onClick={() => toggle(img.id)}
                   >
-                    {isExpanded ? '▲' : '▼'}
+                    {isExpanded ? '△' : '▽'}
                   </button>
                   {/* Remove */}
                   <button
