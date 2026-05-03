@@ -1,0 +1,6 @@
+html,body,#root{height:100%;margin:0}
+body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial}
+.app{display:flex;height:100vh}
+.sidebar{width:320px;padding:12px;border-right:1px solid #eee;box-sizing:border-box}
+.canvas{flex:1}
+.upload-preview{max-width:100%;height:auto;border:1px solid #ddd}

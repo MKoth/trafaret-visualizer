@@ -1,0 +1,30 @@
+{
+  "name": "trafaret-visualizer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "three": "^0.156.0",
+    "@react-three/fiber": "^8.0.27",
+    "@react-three/drei": "^9.56.0",
+    "marchingsquares": "^1.1.0",
+    "simplify-js": "^1.2.4",
+    "clipper-lib": "^6.4.2",
+    "earcut": "^2.2.2",
+    "jspdf": "^2.5.1",
+    "svg2pdf.js": "^1.3.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "typescript": "^5.1.6",
+    "@types/react": "^18.0.28",
+    "@types/react-dom": "^18.0.11"
+  }
+}
