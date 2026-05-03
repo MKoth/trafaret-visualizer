@@ -4,12 +4,17 @@ import Upload from './components/Upload'
 import Scene from './components/Scene'
 import ImageList from './components/ImageList'
 import LevelManager from './components/LevelManager'
+import ProjectSwitcher from './components/ProjectSwitcher'
+import ConfirmModal from './components/ConfirmModal'
 import { imageToContours } from './utils/contour'
 import type { ContourParams } from './utils/contour'
 import type { Level, ImageEntry, ImageRenderData, ImageTransform, TransformMode } from './types'
 import {
-  loadLevels,
-  loadImages,
+  loadProjects,
+  saveProject,
+  deleteProject,
+  loadLevelsByProject,
+  loadImagesByProject,
   saveLevel,
   deleteLevel,
   saveImage,
@@ -22,8 +27,11 @@ import {
 } from './store/db'
 
 export default function App() {
+  const [projects, setProjects] = useState<any[]>([])
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [levels, setLevels] = useState<Level[]>([])
   const [images, setImages] = useState<ImageEntry[]>([])
+  const [confirm, setConfirm] = useState<{ open: boolean; type: 'image' | 'level' | 'project' | null; id?: string }>({ open: false, type: null })
   const [renderData, setRenderData] = useState<Record<string, ImageRenderData>>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
@@ -37,17 +45,36 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const [storedLevels, storedImages] = await Promise.all([loadLevels(), loadImages()])
+      const projs = await loadProjects()
+      if (cancelled) return
+      setProjects(projs)
+
+      // Choose active project from localStorage if present
+      const saved = window.localStorage.getItem('activeProjectId')
+      let activeId: string | null = saved && projs.find(p => p.id === saved) ? saved : (projs[0]?.id ?? null)
+
+      // If no projects exist, create a default one
+      if (!activeId) {
+        const id = uuidv4()
+        const p = { id, name: 'My Project', createdAt: Date.now() }
+        await saveProject(p)
+        setProjects([...(projs || []), p])
+        activeId = id
+      }
+
+      setActiveProjectId(activeId)
+      window.localStorage.setItem('activeProjectId', activeId!)
+
+      // Load levels and images for that project
+      const [storedLevels, storedImages] = await Promise.all([loadLevelsByProject(activeId!), loadImagesByProject(activeId!)])
       if (cancelled) return
       setLevels(storedLevels)
-      // Regenerate blob URLs from stored Blobs
       const rehydrated: ImageEntry[] = storedImages.map(si => {
         const src = URL.createObjectURL(si.blob)
         blobUrlsRef.current[si.id] = src
         return { ...si, src, transform: si.transform ?? DEFAULT_TRANSFORM }
       })
       setImages(rehydrated)
-      // Kick off contour extraction for all rehydrated images
       rehydrated.forEach(img => extractContours(img.id, img.src, img.params))
       setReady(true)
     })()
@@ -94,6 +121,7 @@ export default function App() {
           blob,
           src,
           levelId: null,
+          projectId: activeProjectId ?? '',
           params: { ...DEFAULT_CONTOUR_PARAMS },
           transform: { ...DEFAULT_TRANSFORM },
         }
@@ -104,7 +132,7 @@ export default function App() {
         extractContours(id, src, entry.params)
       }
     },
-    [extractContours]
+    [extractContours, activeProjectId]
   )
 
   // ── Remove image ─────────────────────────────────────────────────────────────
@@ -122,6 +150,39 @@ export default function App() {
     if (selectedId === id) setSelectedId(null)
     await deleteImageFromDB(id)
   }, [selectedId])
+
+  // Show confirm for delete actions
+  const confirmDelete = (type: 'image' | 'level' | 'project', id: string) => {
+    setConfirm({ open: true, type, id })
+  }
+
+  const runConfirmedDelete = async () => {
+    if (!confirm.open || !confirm.type || !confirm.id) return
+    const id = confirm.id
+    if (confirm.type === 'image') {
+      await handleRemoveImage(id)
+    } else if (confirm.type === 'level') {
+      await handleDeleteLevel(id)
+    } else if (confirm.type === 'project') {
+      // Delete project and cascade
+      await deleteProject(id)
+      setProjects(prev => prev.filter(p => p.id !== id))
+      // If deleted active, switch
+      if (activeProjectId === id) {
+        const next = projects.find(p => p.id !== id)
+        if (next) {
+          window.localStorage.setItem('activeProjectId', next.id)
+          window.location.reload()
+        } else {
+          window.localStorage.removeItem('activeProjectId')
+          window.location.reload()
+        }
+      }
+    }
+    setConfirm({ open: false, type: null })
+  }
+
+  const cancelConfirmedDelete = () => setConfirm({ open: false, type: null })
 
   // ── Per-image param change ────────────────────────────────────────────────────
   const handleParamChange = useCallback(
@@ -166,11 +227,12 @@ export default function App() {
         zOffset: prev.length * (DEFAULT_LEVEL_THICKNESS + 1),
         thickness: DEFAULT_LEVEL_THICKNESS,
         color: DEFAULT_LEVEL_COLOR,
+        projectId: activeProjectId ?? '',
       }
       saveLevel(level)
       return [...prev, level]
     })
-  }, [])
+  }, [activeProjectId])
 
   // ── Update level ──────────────────────────────────────────────────────────────
   const handleUpdateLevel = useCallback(async (updated: Level) => {
@@ -191,6 +253,7 @@ export default function App() {
     await deleteLevel(id)
   }, [])
 
+
   if (!ready) {
     return (
       <div className="app" style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -206,11 +269,30 @@ export default function App() {
 
         <Upload onLoadImages={handleLoadImages} />
 
+        <ProjectSwitcher
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onCreate={async (name: string) => {
+            const id = uuidv4()
+            const p = { id, name, createdAt: Date.now() }
+            await saveProject(p)
+            setProjects(prev => [...prev, p])
+            // switch to new project
+            window.localStorage.setItem('activeProjectId', id)
+            window.location.reload()
+          }}
+          onSwitch={id => {
+            window.localStorage.setItem('activeProjectId', id)
+            window.location.reload()
+          }}
+          onDelete={id => confirmDelete('project', id)}
+        />
+
         <LevelManager
           levels={levels}
           onAdd={handleAddLevel}
           onChange={handleUpdateLevel}
-          onDelete={handleDeleteLevel}
+          onDelete={id => confirmDelete('level', id)}
         />
 
         <ImageList
@@ -220,9 +302,23 @@ export default function App() {
           selectedId={selectedId}
           mmPerUnit={mmPerUnit}
           onSelect={setSelectedId}
-          onRemove={handleRemoveImage}
+          onRemove={id => confirmDelete('image', id)}
           onParamChange={handleParamChange}
           onLevelChange={handleLevelChange}
+        />
+
+        <ConfirmModal
+          open={confirm.open}
+          title={confirm.type === 'project' ? 'Delete project' : confirm.type === 'level' ? 'Delete level' : 'Delete image'}
+          message={
+            confirm.type === 'project'
+              ? 'Are you sure you want to delete this project and all its levels and images? This cannot be undone.'
+              : confirm.type === 'level'
+              ? 'Are you sure you want to delete this level? Images assigned to it will be unassigned.'
+              : 'Are you sure you want to delete this image?'
+          }
+          onConfirm={runConfirmedDelete}
+          onCancel={cancelConfirmedDelete}
         />
 
         <div style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 12 }}>

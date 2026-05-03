@@ -8,6 +8,13 @@ export type Level = {
   zOffset: number
   thickness: number
   color: string
+  projectId: string
+}
+
+export type Project = {
+  id: string
+  name: string
+  createdAt: number
 }
 
 export type ImageTransform = {
@@ -28,6 +35,7 @@ export type ImageEntry = {
   /** Runtime blob URL — regenerated after load, not persisted */
   src: string
   levelId: string | null
+  projectId: string
   params: ContourParams
   transform: ImageTransform
 }
