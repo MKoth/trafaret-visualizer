@@ -30,3 +30,9 @@ body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial}
 
 /* ── Divider ─────────────────────────────────────────────── */
 .sidebar hr{border:none;border-top:1px solid #eee;margin:12px 0}
+/* ── Transform toolbar (viewport overlay) ───────────────── */
+.canvas{position:relative}
+.transform-toolbar{position:absolute;top:12px;right:12px;z-index:10;display:flex;gap:4px;background:rgba(0,0,0,.45);border-radius:6px;padding:4px}
+.toolbar-btn{background:transparent;border:1px solid rgba(255,255,255,.25);border-radius:4px;color:#ddd;cursor:pointer;font-size:12px;padding:4px 10px;transition:background .15s}
+.toolbar-btn:hover{background:rgba(255,255,255,.15)}
+.toolbar-btn--active{background:rgba(74,158,255,.7);border-color:#4a9eff;color:#fff}

@@ -21,6 +21,7 @@ type Props = {
   renderData: Record<string, ImageRenderData>
   levels: Level[]
   selectedId: string | null
+  mmPerUnit: number
   onSelect: (id: string) => void
   onRemove: (id: string) => void
   onParamChange: (id: string, key: keyof ContourParams, value: number | boolean) => void
@@ -32,6 +33,7 @@ export default function ImageList({
   renderData,
   levels,
   selectedId,
+  mmPerUnit,
   onSelect,
   onRemove,
   onParamChange,
@@ -77,15 +79,6 @@ export default function ImageList({
                   </span>
                 </div>
                 <div className="image-item__actions" onClick={e => e.stopPropagation()}>
-                  {/* Save / download */}
-                  <a
-                    href={img.src}
-                    download={img.filename}
-                    title="Download image"
-                    className="icon-btn"
-                  >
-                    ↓
-                  </a>
                   {/* Expand params */}
                   <button
                     className="icon-btn"
@@ -104,6 +97,18 @@ export default function ImageList({
                   </button>
                 </div>
               </div>
+
+              {/* Size in mm (only when norm is available) */}
+              {isSelected && rd?.norm && (
+                <div style={{ fontSize: 11, color: '#555', margin: '4px 0 2px', display: 'flex', gap: 12 }}>
+                  <span>
+                    W: {(rd.norm.w * rd.norm.scale * img.transform.scaleX * mmPerUnit).toFixed(1)} mm
+                  </span>
+                  <span>
+                    H: {(rd.norm.h * rd.norm.scale * img.transform.scaleY * mmPerUnit).toFixed(1)} mm
+                  </span>
+                </div>
+              )}
 
               {/* Level assignment */}
               <div

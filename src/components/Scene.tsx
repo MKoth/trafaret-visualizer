@@ -1,15 +1,19 @@
-import React, { Suspense, useMemo } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useTexture } from '@react-three/drei'
+import React, { Suspense, useMemo, useRef, useCallback } from 'react'
+import { Canvas, useThree } from '@react-three/fiber'
+import { OrbitControls, useTexture, ContactShadows, TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
 import type { ContourShape, ContourNorm } from '../utils/contour'
-import type { Level, ImageEntry, ImageRenderData } from '../types'
+import type { Level, ImageEntry, ImageRenderData, ImageTransform, TransformMode } from '../types'
 import { DEFAULT_LEVEL_THICKNESS, DEFAULT_LEVEL_Z_OFFSET, DEFAULT_LEVEL_COLOR } from '../store/db'
 
 type SceneProps = {
   images: ImageEntry[]
   renderData: Record<string, ImageRenderData>
   levels: Level[]
+  selectedId: string | null
+  transformMode: TransformMode
+  onSelect: (id: string | null) => void
+  onTransformChange: (id: string, t: ImageTransform) => void
 }
 
 function ExtrudedShape({
@@ -69,18 +73,112 @@ function ImageOverlay({
   )
 }
 
-export default function Scene({ images, renderData, levels }: SceneProps) {
+/** A single image group — handles its own click and gizmo when selected */
+function ImageGroup({
+  img,
+  rd,
+  depth,
+  zOffset,
+  color,
+  isSelected,
+  transformMode,
+  onSelect,
+  onTransformChange,
+}: {
+  img: ImageEntry
+  rd: ImageRenderData
+  depth: number
+  zOffset: number
+  color: string
+  isSelected: boolean
+  transformMode: TransformMode
+  onSelect: (id: string | null) => void
+  onTransformChange: (id: string, t: ImageTransform) => void
+}) {
+  const groupRef = useRef<THREE.Group>(null)
+  const orbitRef = useThree(state => (state as any).controls)
+  const { x, y, rotationZ, scaleX, scaleY } = img.transform
+
+  // Map our TransformMode to drei TransformControls props
+  const tcMode: 'translate' | 'rotate' | 'scale' =
+    transformMode === 'translate' ? 'translate'
+    : transformMode === 'rotate' ? 'rotate'
+    : 'scale'
+
+  const showX = transformMode === 'translate' || transformMode === 'scale-x' || transformMode === 'scale-both'
+  const showY = transformMode === 'translate' || transformMode === 'scale-y' || transformMode === 'scale-both'
+  const showZ = transformMode === 'rotate'
+
+  const handleChange = useCallback(() => {
+    const g = groupRef.current
+    if (!g) return
+    onTransformChange(img.id, {
+      x: g.position.x,
+      y: g.position.y,
+      rotationZ: g.rotation.z,
+      scaleX: g.scale.x,
+      scaleY: g.scale.y,
+    })
+  }, [img.id, onTransformChange])
+
+  return (
+    <>
+      {isSelected && groupRef.current && (
+        <TransformControls
+          object={groupRef.current}
+          mode={tcMode}
+          showX={showX}
+          showY={showY}
+          showZ={showZ}
+          onMouseDown={() => { if (orbitRef) orbitRef.enabled = false }}
+          onMouseUp={() => { if (orbitRef) orbitRef.enabled = true }}
+          onChange={handleChange}
+        />
+      )}
+      <group
+        ref={groupRef}
+        position={[x, y, 0]}
+        rotation={[0, 0, rotationZ]}
+        scale={[scaleX, scaleY, 1]}
+        onClick={e => { e.stopPropagation(); onSelect(img.id) }}
+      >
+        {rd.shapes.map((shape, idx) => (
+          <ExtrudedShape key={idx} shape={shape} depth={depth} zOffset={zOffset} color={color} />
+        ))}
+        {rd.norm && (
+          <Suspense fallback={null}>
+            <ImageOverlay imageSrc={img.src} norm={rd.norm} zOffset={zOffset} thickness={depth} />
+          </Suspense>
+        )}
+      </group>
+    </>
+  )
+}
+
+export default function Scene({ images, renderData, levels, selectedId, transformMode, onSelect, onTransformChange }: SceneProps) {
   const levelMap = useMemo(
     () => new Map(levels.map(l => [l.id, l])),
     [levels]
   )
 
   return (
-    <Canvas camera={{ position: [0, 0, 200], fov: 45 }} style={{ background: '#1a1a2e' }}>
+    <Canvas
+      camera={{ position: [0, 0, 200], fov: 45 }}
+      style={{ background: '#1a1a2e' }}
+      onPointerMissed={() => onSelect(null)}
+    >
       <ambientLight intensity={0.6} />
       <directionalLight position={[100, 100, 100]} intensity={0.8} />
       <directionalLight position={[-100, -50, 50]} intensity={0.3} />
       <OrbitControls makeDefault />
+
+      <ContactShadows
+        position={[0, 0, -0.5]}
+        opacity={0.2}
+        blur={2.5}
+        far={60}
+        resolution={512}
+      />
 
       {images.map(img => {
         const rd = renderData[img.id]
@@ -92,29 +190,18 @@ export default function Scene({ images, renderData, levels }: SceneProps) {
         const color = level?.color ?? DEFAULT_LEVEL_COLOR
 
         return (
-          <React.Fragment key={img.id}>
-            <group>
-              {rd.shapes.map((shape, idx) => (
-                <ExtrudedShape
-                  key={idx}
-                  shape={shape}
-                  depth={depth}
-                  zOffset={zOffset}
-                  color={color}
-                />
-              ))}
-            </group>
-            {rd.norm && (
-              <Suspense fallback={null}>
-                <ImageOverlay
-                  imageSrc={img.src}
-                  norm={rd.norm}
-                  zOffset={zOffset}
-                  thickness={depth}
-                />
-              </Suspense>
-            )}
-          </React.Fragment>
+          <ImageGroup
+            key={img.id}
+            img={img}
+            rd={rd}
+            depth={depth}
+            zOffset={zOffset}
+            color={color}
+            isSelected={img.id === selectedId}
+            transformMode={transformMode}
+            onSelect={onSelect}
+            onTransformChange={onTransformChange}
+          />
         )
       })}
     </Canvas>

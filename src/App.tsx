@@ -6,7 +6,7 @@ import ImageList from './components/ImageList'
 import LevelManager from './components/LevelManager'
 import { imageToContours } from './utils/contour'
 import type { ContourParams } from './utils/contour'
-import type { Level, ImageEntry, ImageRenderData } from './types'
+import type { Level, ImageEntry, ImageRenderData, ImageTransform, TransformMode } from './types'
 import {
   loadLevels,
   loadImages,
@@ -18,6 +18,7 @@ import {
   DEFAULT_CONTOUR_PARAMS,
   DEFAULT_LEVEL_THICKNESS,
   DEFAULT_LEVEL_COLOR,
+  DEFAULT_TRANSFORM,
 } from './store/db'
 
 export default function App() {
@@ -26,6 +27,8 @@ export default function App() {
   const [renderData, setRenderData] = useState<Record<string, ImageRenderData>>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+  const [transformMode, setTransformMode] = useState<TransformMode>('translate')
+  const [mmPerUnit, setMmPerUnit] = useState(1)
 
   // Track blob URLs created for images so we can revoke them on removal
   const blobUrlsRef = useRef<Record<string, string>>({})
@@ -41,7 +44,7 @@ export default function App() {
       const rehydrated: ImageEntry[] = storedImages.map(si => {
         const src = URL.createObjectURL(si.blob)
         blobUrlsRef.current[si.id] = src
-        return { ...si, src }
+        return { ...si, src, transform: si.transform ?? DEFAULT_TRANSFORM }
       })
       setImages(rehydrated)
       // Kick off contour extraction for all rehydrated images
@@ -92,6 +95,7 @@ export default function App() {
           src,
           levelId: null,
           params: { ...DEFAULT_CONTOUR_PARAMS },
+          transform: { ...DEFAULT_TRANSFORM },
         }
 
         setImages(prev => [...prev, entry])
@@ -138,6 +142,12 @@ export default function App() {
     },
     [extractContours]
   )
+
+  // ── Transform change from viewport gizmo ────────────────────────────────────
+  const handleTransformChange = useCallback(async (imgId: string, transform: ImageTransform) => {
+    setImages(prev => prev.map(img => img.id === imgId ? { ...img, transform } : img))
+    await updateImageMeta(imgId, { transform })
+  }, [])
 
   // ── Level assignment on image ─────────────────────────────────────────────────
   const handleLevelChange = useCallback(async (imgId: string, levelId: string | null) => {
@@ -208,15 +218,56 @@ export default function App() {
           renderData={renderData}
           levels={levels}
           selectedId={selectedId}
+          mmPerUnit={mmPerUnit}
           onSelect={setSelectedId}
           onRemove={handleRemoveImage}
           onParamChange={handleParamChange}
           onLevelChange={handleLevelChange}
         />
+
+        <div style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+            <label htmlFor="mmPerUnit" style={{ whiteSpace: 'nowrap' }}>1 unit =</label>
+            <input
+              id="mmPerUnit"
+              type="number"
+              min={0.001}
+              step={0.1}
+              value={mmPerUnit}
+              onChange={e => setMmPerUnit(parseFloat(e.target.value) || 1)}
+              style={{ width: 70, fontSize: 13 }}
+            />
+            <span>mm</span>
+          </div>
+        </div>
       </div>
 
-      <div className="canvas">
-        <Scene images={images} renderData={renderData} levels={levels} />
+      <div className="canvas" style={{ position: 'relative' }}>
+        {/* Transform mode toolbar */}
+        <div className="transform-toolbar">
+          {(['translate', 'rotate', 'scale-x', 'scale-y', 'scale-both'] as TransformMode[]).map(mode => (
+            <button
+              key={mode}
+              className={`toolbar-btn${transformMode === mode ? ' toolbar-btn--active' : ''}`}
+              onClick={() => setTransformMode(mode)}
+              title={mode}
+            >
+              {mode === 'translate' ? 'Move' :
+               mode === 'rotate' ? 'Rotate' :
+               mode === 'scale-x' ? 'W' :
+               mode === 'scale-y' ? 'H' : 'W+H'}
+            </button>
+          ))}
+        </div>
+        <Scene
+          images={images}
+          renderData={renderData}
+          levels={levels}
+          selectedId={selectedId}
+          transformMode={transformMode}
+          onSelect={setSelectedId}
+          onTransformChange={handleTransformChange}
+        />
       </div>
     </div>
   )

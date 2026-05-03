@@ -10,6 +10,16 @@ export type Level = {
   color: string
 }
 
+export type ImageTransform = {
+  x: number
+  y: number
+  rotationZ: number
+  scaleX: number
+  scaleY: number
+}
+
+export type TransformMode = 'translate' | 'rotate' | 'scale-x' | 'scale-y' | 'scale-both'
+
 export type ImageEntry = {
   id: string
   filename: string
@@ -19,6 +29,7 @@ export type ImageEntry = {
   src: string
   levelId: string | null
   params: ContourParams
+  transform: ImageTransform
 }
 
 /** Derived per-image render data (not persisted) */
