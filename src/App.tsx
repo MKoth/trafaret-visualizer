@@ -25,6 +25,7 @@ import {
   DEFAULT_LEVEL_COLOR,
   DEFAULT_TRANSFORM,
 } from './store/db'
+import TemplateEditor from './components/TemplateEditor'
 
 export default function App() {
   const [projects, setProjects] = useState<any[]>([])
@@ -37,6 +38,7 @@ export default function App() {
   const [ready, setReady] = useState(false)
   const [transformMode, setTransformMode] = useState<TransformMode>('translate')
   const [mmPerUnit, setMmPerUnit] = useState(1)
+  const [showTemplate, setShowTemplate] = useState(false)
 
   // Track blob URLs created for images so we can revoke them on removal
   const blobUrlsRef = useRef<Record<string, string>>({})
@@ -335,6 +337,9 @@ export default function App() {
             />
             <span>mm</span>
           </div>
+          <div style={{ marginTop: 8 }}>
+            <button className="icon-btn" onClick={() => setShowTemplate(true)}>Create Template</button>
+          </div>
         </div>
       </div>
 
@@ -365,6 +370,14 @@ export default function App() {
           onTransformChange={handleTransformChange}
         />
       </div>
+      {showTemplate && (
+        <TemplateEditor
+          images={images}
+          renderData={renderData}
+          mmPerUnit={mmPerUnit}
+          onClose={() => setShowTemplate(false)}
+        />
+      )}
     </div>
   )
 }

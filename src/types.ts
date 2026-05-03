@@ -46,3 +46,13 @@ export type ImageRenderData = {
   norm: ContourNorm | null
   extracting: boolean
 }
+
+export type TemplateItem = {
+  instanceId: string
+  imageId: string
+  x: number // mm from page left
+  y: number // mm from page top
+  widthMm: number
+  heightMm: number
+  rotationRad: number
+}
