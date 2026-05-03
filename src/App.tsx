@@ -67,6 +67,10 @@ export default function App() {
       setActiveProjectId(activeId)
       window.localStorage.setItem('activeProjectId', activeId!)
 
+      // Restore mmPerUnit for this project (saved per-project)
+      const savedMmPerUnit = window.localStorage.getItem(`mmPerUnit:${activeId}`)
+      if (savedMmPerUnit) setMmPerUnit(parseFloat(savedMmPerUnit) || 1)
+
       // Load levels and images for that project
       const [storedLevels, storedImages] = await Promise.all([loadLevelsByProject(activeId!), loadImagesByProject(activeId!)])
       if (cancelled) return
@@ -307,6 +311,7 @@ export default function App() {
           onRemove={id => confirmDelete('image', id)}
           onParamChange={handleParamChange}
           onLevelChange={handleLevelChange}
+          onTransformChange={handleTransformChange}
         />
 
         <ConfirmModal
@@ -332,7 +337,11 @@ export default function App() {
               min={0.001}
               step={0.1}
               value={mmPerUnit}
-              onChange={e => setMmPerUnit(parseFloat(e.target.value) || 1)}
+              onChange={e => {
+                const v = parseFloat(e.target.value) || 1
+                setMmPerUnit(v)
+                if (activeProjectId) window.localStorage.setItem(`mmPerUnit:${activeProjectId}`, String(v))
+              }}
               style={{ width: 70, fontSize: 13 }}
             />
             <span>mm</span>

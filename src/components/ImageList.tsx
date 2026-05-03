@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import type { ImageEntry, ImageRenderData, Level, ContourParams } from '../types'
+import type { ImageEntry, ImageRenderData, Level, ContourParams, ImageTransform } from '../types'
 
 type SliderDef = {
   key: keyof ContourParams & string
@@ -26,6 +26,7 @@ type Props = {
   onRemove: (id: string) => void
   onParamChange: (id: string, key: keyof ContourParams, value: number | boolean) => void
   onLevelChange: (id: string, levelId: string | null) => void
+  onTransformChange: (id: string, transform: ImageTransform) => void
 }
 
 export default function ImageList({
@@ -38,6 +39,7 @@ export default function ImageList({
   onRemove,
   onParamChange,
   onLevelChange,
+  onTransformChange,
 }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
@@ -100,13 +102,39 @@ export default function ImageList({
 
               {/* Size in mm (only when norm is available) */}
               {isSelected && rd?.norm && (
-                <div style={{ fontSize: 11, color: '#555', margin: '4px 0 2px', display: 'flex', gap: 12 }}>
-                  <span>
-                    W: {(rd.norm.w * rd.norm.scale * img.transform.scaleX * mmPerUnit).toFixed(1)} mm
-                  </span>
-                  <span>
-                    H: {(rd.norm.h * rd.norm.scale * img.transform.scaleY * mmPerUnit).toFixed(1)} mm
-                  </span>
+                <div style={{ fontSize: 11, color: '#555', margin: '4px 0 2px', display: 'flex', gap: 8, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                  <label style={{ fontSize: 11 }}>W:</label>
+                  <input
+                    type="number"
+                    min={0.1}
+                    step={0.1}
+                    style={{ width: 70, fontSize: 11 }}
+                    value={parseFloat((rd.norm.w * rd.norm.scale * img.transform.scaleX * mmPerUnit).toFixed(1))}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value)
+                      if (!isNaN(v) && v > 0) {
+                        const newScaleX = v / (rd.norm!.w * rd.norm!.scale * mmPerUnit)
+                        onTransformChange(img.id, { ...img.transform, scaleX: newScaleX })
+                      }
+                    }}
+                  />
+                  <span style={{ fontSize: 11 }}>mm</span>
+                  <label style={{ fontSize: 11, marginLeft: 8 }}>H:</label>
+                  <input
+                    type="number"
+                    min={0.1}
+                    step={0.1}
+                    style={{ width: 70, fontSize: 11 }}
+                    value={parseFloat((rd.norm.h * rd.norm.scale * img.transform.scaleY * mmPerUnit).toFixed(1))}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value)
+                      if (!isNaN(v) && v > 0) {
+                        const newScaleY = v / (rd.norm!.h * rd.norm!.scale * mmPerUnit)
+                        onTransformChange(img.id, { ...img.transform, scaleY: newScaleY })
+                      }
+                    }}
+                  />
+                  <span style={{ fontSize: 11 }}>mm</span>
                 </div>
               )}
 
