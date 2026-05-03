@@ -1,6 +1,32 @@
 html,body,#root{height:100%;margin:0}
 body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial}
 .app{display:flex;height:100vh}
-.sidebar{width:320px;padding:12px;border-right:1px solid #eee;box-sizing:border-box}
+.sidebar{width:320px;padding:12px;border-right:1px solid #ddd;box-sizing:border-box;overflow-y:auto;display:flex;flex-direction:column;gap:0}
 .canvas{flex:1}
 .upload-preview{max-width:100%;height:auto;border:1px solid #ddd}
+
+/* ── Level list ──────────────────────────────────────────── */
+.level-list{display:flex;flex-direction:column;gap:8px}
+.level-item{background:#f8f8f8;border:1px solid #e0e0e0;border-radius:6px;padding:8px 10px}
+
+/* ── Image list ──────────────────────────────────────────── */
+.image-list{display:flex;flex-direction:column;gap:6px}
+.image-item{background:#f8f8f8;border:1px solid #e0e0e0;border-radius:6px;padding:8px;cursor:pointer;transition:border-color .15s}
+.image-item:hover{border-color:#aaa}
+.image-item--selected{border-color:#4a9eff;background:#eef5ff}
+.image-item__header{display:flex;align-items:center;gap:8px}
+.image-item__thumb{width:40px;height:40px;object-fit:contain;border:1px solid #ddd;border-radius:3px;background:#fff;flex-shrink:0}
+.image-item__info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.image-item__name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.image-item__status{font-size:11px;color:#888}
+.image-item__actions{display:flex;gap:4px;flex-shrink:0}
+.image-item__level-row{display:flex;align-items:center;margin-top:6px}
+.image-item__params{margin-top:8px;padding-top:8px;border-top:1px solid #e0e0e0}
+
+/* ── Shared icon button ──────────────────────────────────── */
+.icon-btn{background:none;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:12px;padding:2px 6px;line-height:1.4;text-decoration:none;color:inherit}
+.icon-btn:hover{background:#e8e8e8}
+.icon-btn--danger:hover{background:#ffeaea;border-color:#f99;color:#c00}
+
+/* ── Divider ─────────────────────────────────────────────── */
+.sidebar hr{border:none;border-top:1px solid #eee;margin:12px 0}
