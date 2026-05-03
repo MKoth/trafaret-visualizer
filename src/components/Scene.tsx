@@ -1,4 +1,4 @@
-import React, { Suspense, useMemo, useRef, useCallback } from 'react'
+import React, { Suspense, useMemo, useRef, useCallback, useState, useEffect } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, useTexture, ContactShadows, TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
@@ -42,8 +42,14 @@ function ExtrudedShape({
 
   if (!geo) return null
   return (
-    <mesh geometry={geo} position={[0, 0, zOffset]}>
-      <meshStandardMaterial color={color} side={THREE.DoubleSide} />
+    <mesh geometry={geo} position={[0, 0, zOffset]} renderOrder={0}>
+      <meshStandardMaterial
+        color={color}
+        side={THREE.DoubleSide}
+        polygonOffset={true}
+        polygonOffsetFactor={1}
+        polygonOffsetUnits={1}
+      />
     </mesh>
   )
 }
@@ -60,15 +66,24 @@ function ImageOverlay({
   thickness: number
 }) {
   const texture = useTexture(imageSrc)
-  texture.colorSpace = THREE.SRGBColorSpace
+  useEffect(() => {
+    if (texture) texture.colorSpace = THREE.SRGBColorSpace
+  }, [texture])
   const planeW = norm.w * norm.scale
   const planeH = norm.h * norm.scale
   const cx = (norm.w / 2 - norm.bcx) * norm.scale
   const cy = (norm.bcy - norm.h / 2) * norm.scale
   return (
-    <mesh position={[cx, cy, zOffset + thickness + 0.1]}>
+    <mesh position={[cx, cy, zOffset + thickness + 0.5]} renderOrder={1}>
       <planeGeometry args={[planeW, planeH]} />
-      <meshBasicMaterial map={texture} transparent alphaTest={0.01} />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        alphaTest={0.01}
+        polygonOffset={true}
+        polygonOffsetFactor={-1}
+        polygonOffsetUnits={1}
+      />
     </mesh>
   )
 }
@@ -95,7 +110,12 @@ function ImageGroup({
   onSelect: (id: string | null) => void
   onTransformChange: (id: string, t: ImageTransform) => void
 }) {
-  const groupRef = useRef<THREE.Group>(null)
+  const [groupMounted, setGroupMounted] = useState(false)
+  const groupRef = useRef<THREE.Group | null>(null)
+  const setGroupRef = useCallback((node: THREE.Group | null) => {
+    groupRef.current = node
+    setGroupMounted(!!node)
+  }, [])
   const orbitRef = useThree(state => (state as any).controls)
   const { x, y, rotationZ, scaleX, scaleY } = img.transform
 
@@ -109,34 +129,34 @@ function ImageGroup({
   const showY = transformMode === 'translate' || transformMode === 'scale-y' || transformMode === 'scale-both'
   const showZ = transformMode === 'rotate'
 
-  const handleChange = useCallback(() => {
-    const g = groupRef.current
-    if (!g) return
-    onTransformChange(img.id, {
-      x: g.position.x,
-      y: g.position.y,
-      rotationZ: g.rotation.z,
-      scaleX: g.scale.x,
-      scaleY: g.scale.y,
-    })
-  }, [img.id, onTransformChange])
+  // commit transform only on mouse-up to avoid fighting TransformControls during drag
 
   return (
     <>
-      {isSelected && groupRef.current && (
+      {isSelected && groupMounted && (
         <TransformControls
-          object={groupRef.current}
+          object={groupRef.current!}
           mode={tcMode}
           showX={showX}
           showY={showY}
           showZ={showZ}
           onMouseDown={() => { if (orbitRef) orbitRef.enabled = false }}
-          onMouseUp={() => { if (orbitRef) orbitRef.enabled = true }}
-          onChange={handleChange}
+          onMouseUp={() => {
+            if (orbitRef) orbitRef.enabled = true
+            const g = groupRef.current
+            if (!g) return
+            onTransformChange(img.id, {
+              x: g.position.x,
+              y: g.position.y,
+              rotationZ: g.rotation.z,
+              scaleX: g.scale.x,
+              scaleY: g.scale.y,
+            })
+          }}
         />
       )}
       <group
-        ref={groupRef}
+        ref={setGroupRef}
         position={[x, y, 0]}
         rotation={[0, 0, rotationZ]}
         scale={[scaleX, scaleY, 1]}
@@ -163,7 +183,8 @@ export default function Scene({ images, renderData, levels, selectedId, transfor
 
   return (
     <Canvas
-      camera={{ position: [0, 0, 200], fov: 45 }}
+      gl={{ logarithmicDepthBuffer: true }}
+      camera={{ position: [0, 0, 200], fov: 45, near: 0.1, far: 10000 }}
       style={{ background: '#1a1a2e' }}
       onPointerMissed={() => onSelect(null)}
     >
