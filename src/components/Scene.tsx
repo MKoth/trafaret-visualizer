@@ -208,7 +208,7 @@ export default function Scene({ images, renderData, levels, selectedId, transfor
         const level = img.levelId ? levelMap.get(img.levelId) : undefined
         const depth = level?.thickness ?? DEFAULT_LEVEL_THICKNESS
         const zOffset = level?.zOffset ?? DEFAULT_LEVEL_Z_OFFSET
-        const color = level?.color ?? DEFAULT_LEVEL_COLOR
+        const color = img.shapeColor ?? level?.color ?? DEFAULT_LEVEL_COLOR
 
         return (
           <ImageGroup

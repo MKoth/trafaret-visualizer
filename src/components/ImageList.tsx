@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import type { ImageEntry, ImageRenderData, Level, ContourParams, ImageTransform } from '../types'
+import { DEFAULT_LEVEL_COLOR } from '../store/db'
 
 type SliderDef = {
   key: keyof ContourParams & string
@@ -28,6 +29,7 @@ type Props = {
   onLevelChange: (id: string, levelId: string | null) => void
   onTransformChange: (id: string, transform: ImageTransform) => void
   onReorder: (fromIndex: number, toIndex: number) => void
+  onColorChange: (id: string, color: string) => void
 }
 
 export default function ImageList({
@@ -42,6 +44,7 @@ export default function ImageList({
   onLevelChange,
   onTransformChange,
   onReorder,
+  onColorChange,
 }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
@@ -83,6 +86,14 @@ export default function ImageList({
                   </span>
                 </div>
                 <div className="image-item__actions" onClick={e => e.stopPropagation()}>
+                  {/* Per-image shape color */}
+                  <input
+                    type="color"
+                    title="Shape color"
+                    value={img.shapeColor ?? (img.levelId ? (levels.find(l => l.id === img.levelId)?.color ?? DEFAULT_LEVEL_COLOR) : DEFAULT_LEVEL_COLOR)}
+                    onChange={e => onColorChange(img.id, e.target.value)}
+                    style={{ width: 24, height: 24, padding: 1, border: '1px solid #ccc', borderRadius: 3, cursor: 'pointer', flexShrink: 0 }}
+                  />
                   {/* Reorder */}
                   <button
                     className="icon-btn"

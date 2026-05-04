@@ -35,6 +35,8 @@ export type ImageEntry = {
   /** Runtime blob URL — regenerated after load, not persisted */
   src: string
   levelId: string | null
+  /** Per-image shape color override. Falls back to assigned level color, then DEFAULT_LEVEL_COLOR. */
+  shapeColor?: string
   projectId: string
   params: ContourParams
   transform: ImageTransform

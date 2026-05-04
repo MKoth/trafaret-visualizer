@@ -291,6 +291,12 @@ export default function App() {
     })
   }, [activeProjectId])
 
+  // ── Per-image shape color override ─────────────────────────────────────────
+  const handleColorChange = useCallback(async (imgId: string, color: string) => {
+    setImages(prev => prev.map(img => img.id === imgId ? { ...img, shapeColor: color } : img))
+    await updateImageMeta(imgId, { shapeColor: color })
+  }, [])
+
   // ── Delete level ──────────────────────────────────────────────────────────────
   const handleDeleteLevel = useCallback(async (id: string) => {
     setLevels(prev => prev.filter(l => l.id !== id))
@@ -359,6 +365,7 @@ export default function App() {
           onLevelChange={handleLevelChange}
           onTransformChange={handleTransformChange}
           onReorder={handleReorderImages}
+          onColorChange={handleColorChange}
         />
 
         <ConfirmModal
