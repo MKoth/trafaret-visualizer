@@ -2,6 +2,9 @@ import React, { useState } from 'react'
 import type { ImageEntry, ImageRenderData, Level, ContourParams, ImageTransform } from '../types'
 import { DEFAULT_LEVEL_COLOR, DEFAULT_BORDER_THICKNESS, DEFAULT_BORDER_COLOR } from '../store/db'
 
+const RAD_TO_DEG = 180 / Math.PI
+const DEG_TO_RAD = Math.PI / 180
+
 type SliderDef = {
   key: keyof ContourParams & string
   label: string
@@ -63,6 +66,7 @@ export default function ImageList({
           const rd = renderData[img.id]
           const isSelected = img.id === selectedId
           const isExpanded = !!expanded[img.id]
+          const rotationDeg = parseFloat(((img.transform.rotationZ || 0) * RAD_TO_DEG).toFixed(1))
 
           return (
             <div
@@ -130,39 +134,57 @@ export default function ImageList({
 
               {/* Size in mm (only when norm is available) */}
               {isSelected && rd?.norm && (
-                <div style={{ fontSize: 11, color: '#555', margin: '4px 0 2px', display: 'flex', gap: 8, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                  <label style={{ fontSize: 11 }}>W:</label>
-                  <input
-                    type="number"
-                    min={0.1}
-                    step={0.1}
-                    style={{ width: 70, fontSize: 11 }}
-                    value={parseFloat((rd.norm.w * rd.norm.scale * img.transform.scaleX * mmPerUnit).toFixed(1))}
-                    onChange={e => {
-                      const v = parseFloat(e.target.value)
-                      if (!isNaN(v) && v > 0) {
-                        const newScaleX = v / (rd.norm!.w * rd.norm!.scale * mmPerUnit)
-                        onTransformChange(img.id, { ...img.transform, scaleX: newScaleX })
-                      }
-                    }}
-                  />
-                  <span style={{ fontSize: 11 }}>mm</span>
-                  <label style={{ fontSize: 11, marginLeft: 8 }}>H:</label>
-                  <input
-                    type="number"
-                    min={0.1}
-                    step={0.1}
-                    style={{ width: 70, fontSize: 11 }}
-                    value={parseFloat((rd.norm.h * rd.norm.scale * img.transform.scaleY * mmPerUnit).toFixed(1))}
-                    onChange={e => {
-                      const v = parseFloat(e.target.value)
-                      if (!isNaN(v) && v > 0) {
-                        const newScaleY = v / (rd.norm!.h * rd.norm!.scale * mmPerUnit)
-                        onTransformChange(img.id, { ...img.transform, scaleY: newScaleY })
-                      }
-                    }}
-                  />
-                  <span style={{ fontSize: 11 }}>mm</span>
+                <div style={{ fontSize: 11, color: '#555', margin: '4px 0 2px', display: 'grid', gap: 6 }} onClick={e => e.stopPropagation()}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: 11 }}>W:</label>
+                    <input
+                      type="number"
+                      min={0.1}
+                      step={0.1}
+                      style={{ width: 70, fontSize: 11 }}
+                      value={parseFloat((rd.norm.w * rd.norm.scale * img.transform.scaleX * mmPerUnit).toFixed(1))}
+                      onChange={e => {
+                        const v = parseFloat(e.target.value)
+                        if (!isNaN(v) && v > 0) {
+                          const newScaleX = v / (rd.norm!.w * rd.norm!.scale * mmPerUnit)
+                          onTransformChange(img.id, { ...img.transform, scaleX: newScaleX })
+                        }
+                      }}
+                    />
+                    <span style={{ fontSize: 11 }}>mm</span>
+                    <label style={{ fontSize: 11, marginLeft: 8 }}>H:</label>
+                    <input
+                      type="number"
+                      min={0.1}
+                      step={0.1}
+                      style={{ width: 70, fontSize: 11 }}
+                      value={parseFloat((rd.norm.h * rd.norm.scale * img.transform.scaleY * mmPerUnit).toFixed(1))}
+                      onChange={e => {
+                        const v = parseFloat(e.target.value)
+                        if (!isNaN(v) && v > 0) {
+                          const newScaleY = v / (rd.norm!.h * rd.norm!.scale * mmPerUnit)
+                          onTransformChange(img.id, { ...img.transform, scaleY: newScaleY })
+                        }
+                      }}
+                    />
+                    <span style={{ fontSize: 11 }}>mm</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <label style={{ fontSize: 11 }}>Rot:</label>
+                    <input
+                      type="number"
+                      step={0.1}
+                      style={{ width: 70, fontSize: 11 }}
+                      value={rotationDeg}
+                      onChange={e => {
+                        const v = parseFloat(e.target.value)
+                        if (!isNaN(v)) {
+                          onTransformChange(img.id, { ...img.transform, rotationZ: v * DEG_TO_RAD })
+                        }
+                      }}
+                    />
+                    <span style={{ fontSize: 11 }}>deg</span>
+                  </div>
                 </div>
               )}
 
