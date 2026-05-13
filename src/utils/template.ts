@@ -6,8 +6,8 @@ export function computeItemSize(img: ImageEntry, rd: ImageRenderData | undefined
   if (!rd || !rd.norm) return null
   const norm = rd.norm
   const borderThickness = img.borderThickness ?? 0
-  const widthMm = (norm.w * norm.scale + borderThickness * 2) * img.transform.scaleX * mmPerUnit
-  const heightMm = (norm.h * norm.scale + borderThickness * 2) * img.transform.scaleY * mmPerUnit
+  const widthMm = (norm.w * norm.scale + borderThickness * 2) * Math.abs(img.transform.scaleX) * mmPerUnit
+  const heightMm = (norm.h * norm.scale + borderThickness * 2) * Math.abs(img.transform.scaleY) * mmPerUnit
   const rotationRad = img.transform.rotationZ || 0
   return { widthMm, heightMm, rotationRad }
 }

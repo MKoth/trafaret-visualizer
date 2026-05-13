@@ -80,10 +80,14 @@ function composeItemCanvas(
   const pxPerMm = dpi / 25.4
   const borderThickness = entry.borderThickness ?? 0
   const borderColor = entry.borderColor ?? '#000000'
-  const baseWidthMm = rd.norm.w * rd.norm.scale * entry.transform.scaleX * mmPerUnit
-  const baseHeightMm = rd.norm.h * rd.norm.scale * entry.transform.scaleY * mmPerUnit
-  const padXmm = borderThickness * entry.transform.scaleX * mmPerUnit
-  const padYmm = borderThickness * entry.transform.scaleY * mmPerUnit
+  const scaleX = Math.abs(entry.transform.scaleX)
+  const scaleY = Math.abs(entry.transform.scaleY)
+  const mirrorX = entry.transform.scaleX < 0 ? -1 : 1
+  const mirrorY = entry.transform.scaleY < 0 ? -1 : 1
+  const baseWidthMm = rd.norm.w * rd.norm.scale * scaleX * mmPerUnit
+  const baseHeightMm = rd.norm.h * rd.norm.scale * scaleY * mmPerUnit
+  const padXmm = borderThickness * scaleX * mmPerUnit
+  const padYmm = borderThickness * scaleY * mmPerUnit
   const totalWidthMm = baseWidthMm + padXmm * 2
   const totalHeightMm = baseHeightMm + padYmm * 2
   const widthPx = Math.max(1, Math.round(totalWidthMm * pxPerMm))
@@ -99,6 +103,12 @@ function composeItemCanvas(
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
 
+  ctx.save()
+  if (mirrorX < 0 || mirrorY < 0) {
+    ctx.translate(mirrorX < 0 ? canvas.width : 0, mirrorY < 0 ? canvas.height : 0)
+    ctx.scale(mirrorX, mirrorY)
+  }
+
   if (borderThickness > 0) {
     const borderShapes = dilateContourShapes(rd.shapes, borderThickness)
     if (borderShapes.length > 0) {
@@ -108,8 +118,8 @@ function composeItemCanvas(
         ctx,
         borderShapes,
         rd.norm,
-        entry.transform.scaleX,
-        entry.transform.scaleY,
+        scaleX,
+        scaleY,
         mmPerUnit,
         padXpx,
         padYpx,
@@ -120,6 +130,7 @@ function composeItemCanvas(
   }
 
   ctx.drawImage(imgEl, padXpx, padYpx, baseWidthPx, baseHeightPx)
+  ctx.restore()
 
   return { canvas, widthMm: totalWidthMm, heightMm: totalHeightMm }
 }
@@ -347,8 +358,10 @@ export default function TemplateEditor({ images, renderData, mmPerUnit, onClose 
             {items.map(it => {
               const entry = images.find(i => i.id === it.imageId)!
               const borderThickness = entry.borderThickness ?? 0
-              const padXmm = borderThickness * entry.transform.scaleX * mmPerUnit
-              const padYmm = borderThickness * entry.transform.scaleY * mmPerUnit
+              const scaleX = Math.abs(entry.transform.scaleX)
+              const scaleY = Math.abs(entry.transform.scaleY)
+              const padXmm = borderThickness * scaleX * mmPerUnit
+              const padYmm = borderThickness * scaleY * mmPerUnit
               const imageWidthMm = Math.max(0, it.widthMm - padXmm * 2)
               const imageHeightMm = Math.max(0, it.heightMm - padYmm * 2)
               return (
@@ -376,6 +389,8 @@ export default function TemplateEditor({ images, renderData, mmPerUnit, onClose 
                       height: imageHeightMm * displayScale,
                       objectFit: 'fill',
                       display: 'block',
+                      transform: `scale(${entry.transform.scaleX < 0 ? -1 : 1}, ${entry.transform.scaleY < 0 ? -1 : 1})`,
+                      transformOrigin: 'center',
                       pointerEvents: 'none',
                     }}
                   />
