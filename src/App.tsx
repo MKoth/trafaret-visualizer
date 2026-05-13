@@ -307,6 +307,34 @@ export default function App() {
     await updateImageMeta(imgId, { borderThickness, borderColor })
   }, [])
 
+  const handleCopySelected = useCallback(async () => {
+    if (!selectedId) return
+
+    const source = images.find(img => img.id === selectedId)
+    if (!source) return
+
+    const id = uuidv4()
+    const blob = new Blob([source.blob], { type: source.blob.type })
+    const src = URL.createObjectURL(blob)
+    blobUrlsRef.current[id] = src
+
+    const clone: ImageEntry = {
+      ...source,
+      id,
+      blob,
+      src,
+      params: { ...source.params },
+      transform: { ...source.transform },
+    }
+
+    setImages(prev => [...prev, clone])
+    setSelectedId(id)
+
+    const { src: _src, ...storable } = clone
+    await saveImage(storable)
+    extractContours(id, src, clone.params)
+  }, [extractContours, images, selectedId])
+
   // ── Delete level ──────────────────────────────────────────────────────────────
   const handleDeleteLevel = useCallback(async (id: string) => {
     setLevels(prev => prev.filter(l => l.id !== id))
@@ -419,21 +447,30 @@ export default function App() {
 
       <div className="canvas" style={{ position: 'relative' }}>
         {/* Transform mode toolbar */}
-        <div className="transform-toolbar">
-          {(['translate', 'rotate', 'scale-x', 'scale-y', 'scale-both'] as TransformMode[]).map(mode => (
+        {selectedId && (
+          <div className="transform-toolbar">
+            {(['translate', 'rotate', 'scale-x', 'scale-y', 'scale-both'] as TransformMode[]).map(mode => (
+              <button
+                key={mode}
+                className={`toolbar-btn${transformMode === mode ? ' toolbar-btn--active' : ''}`}
+                onClick={() => setTransformMode(mode)}
+                title={mode}
+              >
+                {mode === 'translate' ? 'Move' :
+                 mode === 'rotate' ? 'Rotate' :
+                 mode === 'scale-x' ? 'W' :
+                 mode === 'scale-y' ? 'H' : 'W+H'}
+              </button>
+            ))}
             <button
-              key={mode}
-              className={`toolbar-btn${transformMode === mode ? ' toolbar-btn--active' : ''}`}
-              onClick={() => setTransformMode(mode)}
-              title={mode}
+              className="toolbar-btn"
+              onClick={() => { void handleCopySelected() }}
+              title="Copy"
             >
-              {mode === 'translate' ? 'Move' :
-               mode === 'rotate' ? 'Rotate' :
-               mode === 'scale-x' ? 'W' :
-               mode === 'scale-y' ? 'H' : 'W+H'}
+              Copy
             </button>
-          ))}
-        </div>
+          </div>
+        )}
         <Scene
           images={images}
           renderData={renderData}
