@@ -1,4 +1,5 @@
 import * as MarchingSquares from 'marchingsquares'
+import ClipperLib from 'clipper-lib'
 import simplify from 'simplify-js'
 
 export type ContourParams = {
@@ -49,6 +50,65 @@ function shoelaceArea(pts: Array<[number, number]>): number {
     a += x1 * y2 - x2 * y1
   }
   return a / 2
+}
+
+function ensureCCW(poly: Array<[number, number]>): Array<[number, number]> {
+  return shoelaceArea(poly) < 0 ? [...poly].reverse() : poly
+}
+
+type ClipperPathPoint = { X: number; Y: number }
+
+const CLIPPER_SCALE = 1000
+
+function toClipperPath(poly: Array<[number, number]>): ClipperPathPoint[] {
+  return poly.map(([x, y]) => ({
+    X: Math.round(x * CLIPPER_SCALE),
+    Y: Math.round(y * CLIPPER_SCALE),
+  }))
+}
+
+function fromClipperPath(path: ClipperPathPoint[]): Array<[number, number]> {
+  return path.map(p => [p.X / CLIPPER_SCALE, p.Y / CLIPPER_SCALE])
+}
+
+export function dilateContourShapes(shapes: ContourShape[], distance: number): ContourShape[] {
+  if (!Number.isFinite(distance) || Math.abs(distance) < 0.0001 || shapes.length === 0) return shapes
+
+  const sourcePaths = shapes
+    .map(shape => ensureCCW(shape.outer))
+    .filter(poly => poly.length >= 3)
+    .map(toClipperPath)
+
+  if (sourcePaths.length === 0) return []
+
+  const clipper = new ClipperLib.Clipper()
+  clipper.AddPaths(sourcePaths, ClipperLib.PolyType.ptSubject, true)
+
+  const mergedPaths: ClipperPathPoint[][] = []
+  clipper.Execute(
+    ClipperLib.ClipType.ctUnion,
+    mergedPaths,
+    ClipperLib.PolyFillType.pftNonZero,
+    ClipperLib.PolyFillType.pftNonZero
+  )
+
+  const offsetter = new ClipperLib.ClipperOffset(
+    2,
+    Math.max(0.5, Math.abs(distance) * 0.35) * CLIPPER_SCALE
+  )
+  offsetter.AddPaths(mergedPaths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon)
+
+  const dilatedPaths: ClipperPathPoint[][] = []
+  offsetter.Execute(dilatedPaths, distance * CLIPPER_SCALE)
+
+  const simplifyTolerance = Math.max(0.25, Math.abs(distance) * 0.2)
+
+  return dilatedPaths
+    .map(fromClipperPath)
+    .map(poly => simplify(poly.map(([x, y]) => ({ x, y })), simplifyTolerance, true)
+      .map((p: { x: number; y: number }) => [p.x, p.y] as [number, number]))
+    .filter(poly => poly.length >= 3)
+    .map(poly => ({ outer: ensureCCW(poly), holes: [] }))
 }
 
 
@@ -122,10 +182,6 @@ export async function imageToContours(
 
         const transform = (poly: Array<[number, number]>): Array<[number, number]> =>
           poly.map(([x, y]) => [(x - bcx) * scale, -(y - bcy) * scale])
-
-        // THREE.Shape needs CCW winding (area > 0 in y-up space)
-        const ensureCCW = (p: Array<[number, number]>): Array<[number, number]> =>
-          shoelaceArea(p) < 0 ? [...p].reverse() : p
 
         const shapes: ContourShape[] = polys
           .map(p => ensureCCW(transform(p)))

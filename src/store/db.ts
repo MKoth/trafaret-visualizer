@@ -124,7 +124,7 @@ export async function deleteImageFromDB(id: string): Promise<void> {
 /** Persist only the changed fields of an image (avoids re-writing full blob on param change) */
 export async function updateImageMeta(
   id: string,
-  patch: Partial<Pick<StoredImage, 'levelId' | 'params' | 'transform' | 'shapeColor'>>
+  patch: Partial<Pick<StoredImage, 'levelId' | 'params' | 'transform' | 'shapeColor' | 'borderThickness' | 'borderColor'>>
 ): Promise<void> {
   const db = await getDB()
   const tx = db.transaction('images', 'readwrite')
@@ -138,6 +138,8 @@ export async function updateImageMeta(
 export const DEFAULT_LEVEL_THICKNESS = 5
 export const DEFAULT_LEVEL_Z_OFFSET = 0
 export const DEFAULT_LEVEL_COLOR = '#f5f5dc'
+export const DEFAULT_BORDER_THICKNESS = 0
+export const DEFAULT_BORDER_COLOR = '#000000'
 
 export const DEFAULT_TRANSFORM: ImageTransform = {
   x: 0,

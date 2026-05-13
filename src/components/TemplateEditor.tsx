@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { jsPDF } from 'jspdf'
 import type { ImageEntry, ImageRenderData, TemplateItem } from '../types'
+import { dilateContourShapes, type ContourNorm, type ContourShape } from '../utils/contour'
 import { computeItemSize, packItems } from '../utils/template'
 
 type Props = {
@@ -16,6 +17,111 @@ const PRESETS: Record<string, [number, number]> = {
   A3: [297, 420],
   A5: [148, 210],
   Letter: [215.9, 279.4],
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const normalized = /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : '#000000'
+  return [
+    parseInt(normalized.slice(1, 3), 16),
+    parseInt(normalized.slice(3, 5), 16),
+    parseInt(normalized.slice(5, 7), 16),
+  ]
+}
+
+function buildShapePath(
+  ctx: CanvasRenderingContext2D,
+  shapes: ContourShape[],
+  norm: ContourNorm,
+  scaleX: number,
+  scaleY: number,
+  mmPerUnit: number,
+  padXpx: number,
+  padYpx: number,
+  pxPerMm: number
+) {
+  const planeW = norm.w * norm.scale
+  const planeH = norm.h * norm.scale
+  const imageLeft = (norm.w / 2 - norm.bcx) * norm.scale - planeW / 2
+  const imageTop = (norm.bcy - norm.h / 2) * norm.scale + planeH / 2
+
+  ctx.beginPath()
+  for (const shape of shapes) {
+    if (shape.outer.length < 3) continue
+    shape.outer.forEach(([x, y], index) => {
+      const px = padXpx + (x - imageLeft) * scaleX * mmPerUnit * pxPerMm
+      const py = padYpx + (imageTop - y) * scaleY * mmPerUnit * pxPerMm
+      if (index === 0) ctx.moveTo(px, py)
+      else ctx.lineTo(px, py)
+    })
+    ctx.closePath()
+
+    for (const hole of shape.holes) {
+      if (hole.length < 3) continue
+      hole.forEach(([x, y], index) => {
+        const px = padXpx + (x - imageLeft) * scaleX * mmPerUnit * pxPerMm
+        const py = padYpx + (imageTop - y) * scaleY * mmPerUnit * pxPerMm
+        if (index === 0) ctx.moveTo(px, py)
+        else ctx.lineTo(px, py)
+      })
+      ctx.closePath()
+    }
+  }
+}
+
+function composeItemCanvas(
+  entry: ImageEntry,
+  rd: ImageRenderData,
+  imgEl: HTMLImageElement,
+  mmPerUnit: number,
+  dpi: number
+) {
+  if (!rd.norm) return null
+
+  const pxPerMm = dpi / 25.4
+  const borderThickness = entry.borderThickness ?? 0
+  const borderColor = entry.borderColor ?? '#000000'
+  const baseWidthMm = rd.norm.w * rd.norm.scale * entry.transform.scaleX * mmPerUnit
+  const baseHeightMm = rd.norm.h * rd.norm.scale * entry.transform.scaleY * mmPerUnit
+  const padXmm = borderThickness * entry.transform.scaleX * mmPerUnit
+  const padYmm = borderThickness * entry.transform.scaleY * mmPerUnit
+  const totalWidthMm = baseWidthMm + padXmm * 2
+  const totalHeightMm = baseHeightMm + padYmm * 2
+  const widthPx = Math.max(1, Math.round(totalWidthMm * pxPerMm))
+  const heightPx = Math.max(1, Math.round(totalHeightMm * pxPerMm))
+  const padXpx = padXmm * pxPerMm
+  const padYpx = padYmm * pxPerMm
+  const baseWidthPx = Math.max(1, Math.round(baseWidthMm * pxPerMm))
+  const baseHeightPx = Math.max(1, Math.round(baseHeightMm * pxPerMm))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = widthPx
+  canvas.height = heightPx
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+
+  if (borderThickness > 0) {
+    const borderShapes = dilateContourShapes(rd.shapes, borderThickness)
+    if (borderShapes.length > 0) {
+      const [r, g, b] = hexToRgb(borderColor)
+      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`
+      buildShapePath(
+        ctx,
+        borderShapes,
+        rd.norm,
+        entry.transform.scaleX,
+        entry.transform.scaleY,
+        mmPerUnit,
+        padXpx,
+        padYpx,
+        pxPerMm
+      )
+      ctx.fill('evenodd')
+    }
+  }
+
+  ctx.drawImage(imgEl, padXpx, padYpx, baseWidthPx, baseHeightPx)
+
+  return { canvas, widthMm: totalWidthMm, heightMm: totalHeightMm }
 }
 
 export default function TemplateEditor({ images, renderData, mmPerUnit, onClose }: Props) {
@@ -140,6 +246,7 @@ export default function TemplateEditor({ images, renderData, mmPerUnit, onClose 
   // Export to PDF
   const handleExport = async () => {
     const pdf = new jsPDF({ unit: 'mm', format: [pageW, pageH] })
+    const dpi = 96
     // preload images
     const imgMap: Record<string, HTMLImageElement> = {}
     await Promise.all(items.map(async it => {
@@ -157,32 +264,32 @@ export default function TemplateEditor({ images, renderData, mmPerUnit, onClose 
     for (const it of items) {
       const imgEl = imgMap[it.imageId]
       if (!imgEl) continue
+      const entry = images.find(i => i.id === it.imageId)
+      const rd = renderData[it.imageId]
+      if (!entry || !rd?.norm) continue
+      const composed = composeItemCanvas(entry, rd, imgEl, mmPerUnit, dpi)
+      if (!composed) continue
       const rot = it.rotationRad || 0
       if (Math.abs(rot) < 0.0001) {
-        pdf.addImage(imgEl, 'PNG', it.x, it.y, it.widthMm, it.heightMm)
+        const x = it.x + (it.widthMm - composed.widthMm) / 2
+        const y = it.y + (it.heightMm - composed.heightMm) / 2
+        pdf.addImage(composed.canvas.toDataURL('image/png'), 'PNG', x, y, composed.widthMm, composed.heightMm)
       } else {
-        // draw to offscreen canvas with rotation
-        const dpi = 96
-        const mmToPx = (mm: number) => Math.round(mm * (dpi / 25.4))
-        const wpx = mmToPx(it.widthMm)
-        const hpx = mmToPx(it.heightMm)
-        const bboxW = Math.abs(Math.cos(rot)) * wpx + Math.abs(Math.sin(rot)) * hpx
-        const bboxH = Math.abs(Math.sin(rot)) * wpx + Math.abs(Math.cos(rot)) * hpx
+        const bboxW = Math.abs(Math.cos(rot)) * composed.canvas.width + Math.abs(Math.sin(rot)) * composed.canvas.height
+        const bboxH = Math.abs(Math.sin(rot)) * composed.canvas.width + Math.abs(Math.cos(rot)) * composed.canvas.height
         const canvas = document.createElement('canvas')
         canvas.width = Math.ceil(bboxW)
         canvas.height = Math.ceil(bboxH)
-        const ctx = canvas.getContext('2d')!
+        const ctx = canvas.getContext('2d')
+        if (!ctx) continue
         ctx.translate(canvas.width / 2, canvas.height / 2)
         ctx.rotate(rot)
-        ctx.drawImage(imgEl, -wpx / 2, -hpx / 2, wpx, hpx)
-        const data = canvas.toDataURL('image/png')
-        // convert back to mm
+        ctx.drawImage(composed.canvas, -composed.canvas.width / 2, -composed.canvas.height / 2)
         const bboxWmm = (canvas.width / dpi) * 25.4
         const bboxHmm = (canvas.height / dpi) * 25.4
-        // adjust position so rotated center aligns
-        const x = it.x - (bboxWmm - it.widthMm) / 2
-        const y = it.y - (bboxHmm - it.heightMm) / 2
-        pdf.addImage(data, 'PNG', x, y, bboxWmm, bboxHmm)
+        const x = it.x + (it.widthMm - bboxWmm) / 2
+        const y = it.y + (it.heightMm - bboxHmm) / 2
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, y, bboxWmm, bboxHmm)
       }
     }
     pdf.save('template.pdf')
@@ -239,6 +346,11 @@ export default function TemplateEditor({ images, renderData, mmPerUnit, onClose 
           <div className="template-paper" ref={paperRef} style={{ width: pageW * displayScale, height: pageH * displayScale }}>
             {items.map(it => {
               const entry = images.find(i => i.id === it.imageId)!
+              const borderThickness = entry.borderThickness ?? 0
+              const padXmm = borderThickness * entry.transform.scaleX * mmPerUnit
+              const padYmm = borderThickness * entry.transform.scaleY * mmPerUnit
+              const imageWidthMm = Math.max(0, it.widthMm - padXmm * 2)
+              const imageHeightMm = Math.max(0, it.heightMm - padYmm * 2)
               return (
                 <div
                   key={it.instanceId}
@@ -252,7 +364,21 @@ export default function TemplateEditor({ images, renderData, mmPerUnit, onClose 
                   }}
                   onPointerDown={e => onPointerDown(e, it)}
                 >
-                  <img src={entry.src} alt={entry.filename} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block', pointerEvents: 'none' }} />
+                  <img
+                    src={entry.src}
+                    alt={entry.filename}
+                    draggable={false}
+                    style={{
+                      position: 'absolute',
+                      left: padXmm * displayScale,
+                      top: padYmm * displayScale,
+                      width: imageWidthMm * displayScale,
+                      height: imageHeightMm * displayScale,
+                      objectFit: 'fill',
+                      display: 'block',
+                      pointerEvents: 'none',
+                    }}
+                  />
                   <button className="template-item__remove icon-btn" onPointerDown={e => e.stopPropagation()} onClick={() => removeInstance(it.instanceId)} style={{ position: 'absolute', right: 6, top: 6 }}>✕</button>
                 </div>
               )

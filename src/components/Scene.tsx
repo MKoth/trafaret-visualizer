@@ -2,7 +2,7 @@ import React, { Suspense, useMemo, useRef, useCallback, useState, useEffect } fr
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, useTexture, ContactShadows, TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
-import type { ContourShape, ContourNorm } from '../utils/contour'
+import { dilateContourShapes, type ContourShape, type ContourNorm } from '../utils/contour'
 import type { Level, ImageEntry, ImageRenderData, ImageTransform, TransformMode } from '../types'
 import { DEFAULT_LEVEL_THICKNESS, DEFAULT_LEVEL_Z_OFFSET, DEFAULT_LEVEL_COLOR } from '../store/db'
 
@@ -49,6 +49,43 @@ function ExtrudedShape({
         polygonOffset={true}
         polygonOffsetFactor={1}
         polygonOffsetUnits={1}
+      />
+    </mesh>
+  )
+}
+
+function BorderShape({
+  shape,
+  depth,
+  zOffset,
+  color,
+}: {
+  shape: ContourShape
+  depth: number
+  zOffset: number
+  color: string
+}) {
+  const geo = useMemo(() => {
+    const { outer, holes } = shape
+    if (!outer || outer.length < 3) return null
+    for (const p of outer) if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) return null
+    const s = new THREE.Shape(outer.map(([x, y]) => new THREE.Vector2(x, y)))
+    for (const hole of holes) {
+      if (hole.length < 3) continue
+      s.holes.push(new THREE.Path(hole.map(([x, y]) => new THREE.Vector2(x, y))))
+    }
+    return new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false })
+  }, [shape, depth])
+
+  if (!geo) return null
+  return (
+    <mesh geometry={geo} position={[0, 0, zOffset - 0.5]} renderOrder={-1}>
+      <meshStandardMaterial
+        color={color}
+        side={THREE.DoubleSide}
+        polygonOffset={true}
+        polygonOffsetFactor={2}
+        polygonOffsetUnits={2}
       />
     </mesh>
   )
@@ -118,6 +155,10 @@ function ImageGroup({
   }, [])
   const orbitRef = useThree(state => (state as any).controls)
   const { x, y, rotationZ, scaleX, scaleY } = img.transform
+  const borderShapes = useMemo(
+    () => dilateContourShapes(rd.shapes, img.borderThickness ?? 0),
+    [rd.shapes, img.borderThickness]
+  )
 
   // Map our TransformMode to drei TransformControls props
   const tcMode: 'translate' | 'rotate' | 'scale' =
@@ -162,6 +203,9 @@ function ImageGroup({
         scale={[scaleX, scaleY, 1]}
         onClick={e => { e.stopPropagation(); onSelect(img.id) }}
       >
+        {borderShapes.map((shape, idx) => (
+          <BorderShape key={`border-${idx}`} shape={shape} depth={depth} zOffset={zOffset} color={img.borderColor ?? '#000000'} />
+        ))}
         {rd.shapes.map((shape, idx) => (
           <ExtrudedShape key={idx} shape={shape} depth={depth} zOffset={zOffset} color={color} />
         ))}

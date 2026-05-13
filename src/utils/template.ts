@@ -5,8 +5,9 @@ export type ItemSize = { widthMm: number; heightMm: number; rotationRad: number 
 export function computeItemSize(img: ImageEntry, rd: ImageRenderData | undefined, mmPerUnit: number): ItemSize | null {
   if (!rd || !rd.norm) return null
   const norm = rd.norm
-  const widthMm = norm.w * norm.scale * img.transform.scaleX * mmPerUnit
-  const heightMm = norm.h * norm.scale * img.transform.scaleY * mmPerUnit
+  const borderThickness = img.borderThickness ?? 0
+  const widthMm = (norm.w * norm.scale + borderThickness * 2) * img.transform.scaleX * mmPerUnit
+  const heightMm = (norm.h * norm.scale + borderThickness * 2) * img.transform.scaleY * mmPerUnit
   const rotationRad = img.transform.rotationZ || 0
   return { widthMm, heightMm, rotationRad }
 }

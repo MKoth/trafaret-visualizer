@@ -37,6 +37,10 @@ export type ImageEntry = {
   levelId: string | null
   /** Per-image shape color override. Falls back to assigned level color, then DEFAULT_LEVEL_COLOR. */
   shapeColor?: string
+  /** Border outline thickness in scene units (0 = no border). */
+  borderThickness?: number
+  /** Border outline color (hex). */
+  borderColor?: string
   projectId: string
   params: ContourParams
   transform: ImageTransform

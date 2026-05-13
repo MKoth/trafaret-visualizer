@@ -23,6 +23,8 @@ import {
   DEFAULT_CONTOUR_PARAMS,
   DEFAULT_LEVEL_THICKNESS,
   DEFAULT_LEVEL_COLOR,
+  DEFAULT_BORDER_THICKNESS,
+  DEFAULT_BORDER_COLOR,
   DEFAULT_TRANSFORM,
 } from './store/db'
 import TemplateEditor from './components/TemplateEditor'
@@ -151,6 +153,8 @@ export default function App() {
           projectId: activeProjectId ?? '',
           params: { ...DEFAULT_CONTOUR_PARAMS },
           transform: { ...DEFAULT_TRANSFORM },
+          borderThickness: DEFAULT_BORDER_THICKNESS,
+          borderColor: DEFAULT_BORDER_COLOR,
         }
 
         setImages(prev => [...prev, entry])
@@ -297,6 +301,12 @@ export default function App() {
     await updateImageMeta(imgId, { shapeColor: color })
   }, [])
 
+  // ── Per-image border change ──────────────────────────────────────────────────
+  const handleBorderChange = useCallback(async (imgId: string, borderThickness: number, borderColor: string) => {
+    setImages(prev => prev.map(img => img.id === imgId ? { ...img, borderThickness, borderColor } : img))
+    await updateImageMeta(imgId, { borderThickness, borderColor })
+  }, [])
+
   // ── Delete level ──────────────────────────────────────────────────────────────
   const handleDeleteLevel = useCallback(async (id: string) => {
     setLevels(prev => prev.filter(l => l.id !== id))
@@ -366,6 +376,7 @@ export default function App() {
           onTransformChange={handleTransformChange}
           onReorder={handleReorderImages}
           onColorChange={handleColorChange}
+          onBorderChange={handleBorderChange}
         />
 
         <ConfirmModal

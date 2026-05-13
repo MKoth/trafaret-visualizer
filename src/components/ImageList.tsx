@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import type { ImageEntry, ImageRenderData, Level, ContourParams, ImageTransform } from '../types'
-import { DEFAULT_LEVEL_COLOR } from '../store/db'
+import { DEFAULT_LEVEL_COLOR, DEFAULT_BORDER_THICKNESS, DEFAULT_BORDER_COLOR } from '../store/db'
 
 type SliderDef = {
   key: keyof ContourParams & string
@@ -30,6 +30,7 @@ type Props = {
   onTransformChange: (id: string, transform: ImageTransform) => void
   onReorder: (fromIndex: number, toIndex: number) => void
   onColorChange: (id: string, color: string) => void
+  onBorderChange: (id: string, borderThickness: number, borderColor: string) => void
 }
 
 export default function ImageList({
@@ -45,6 +46,7 @@ export default function ImageList({
   onTransformChange,
   onReorder,
   onColorChange,
+  onBorderChange,
 }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
@@ -182,6 +184,33 @@ export default function ImageList({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Border */}
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginTop: 4 }}
+                onClick={e => e.stopPropagation()}
+              >
+                <label style={{ whiteSpace: 'nowrap' }}>Border:</label>
+                <input
+                  type="range"
+                  min={0}
+                  max={20}
+                  step={0.5}
+                  value={img.borderThickness ?? DEFAULT_BORDER_THICKNESS}
+                  onChange={e => onBorderChange(img.id, parseFloat(e.target.value), img.borderColor ?? DEFAULT_BORDER_COLOR)}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ fontFamily: 'monospace', minWidth: 28 }}>{(img.borderThickness ?? DEFAULT_BORDER_THICKNESS).toFixed(1)}</span>
+                {(img.borderThickness ?? DEFAULT_BORDER_THICKNESS) > 0 && (
+                  <input
+                    type="color"
+                    title="Border color"
+                    value={img.borderColor ?? DEFAULT_BORDER_COLOR}
+                    onChange={e => onBorderChange(img.id, img.borderThickness ?? DEFAULT_BORDER_THICKNESS, e.target.value)}
+                    style={{ width: 24, height: 24, padding: 1, border: '1px solid #ccc', borderRadius: 3, cursor: 'pointer', flexShrink: 0 }}
+                  />
+                )}
               </div>
 
               {/* Collapsible params */}
